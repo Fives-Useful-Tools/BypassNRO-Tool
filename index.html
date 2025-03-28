@@ -1,0 +1,57 @@
+# <h1>Simple script to restore some now-lost functionality during setup of new computers</h1>
+# Originally hosted on, https://fives-useful-tools.github.io, trusted mirror: https://nro.lol
+# If you run into issues please post them <a href="https://github.com/Fives-Useful-Tools/BypassNRO-Tool/issues">here</a>  <hr><pre>
+
+
+# Locations and static parameters 
+$RegistryPath = "HKLM:\Software\Microsoft\Windows\CurrentVersion\OOBE"
+$ValueName = "BypassNRO"
+$DesiredValue = 1
+$PropertyType = "DWord"
+$AskForReboot = 0
+
+# Retrieve what's already in the registry first
+$nroValue = Get-ItemProperty -Path $RegistryPath -Name $ValueName -ErrorAction SilentlyContinue
+
+# If the setting is already in place ask the user what they want to do
+if ($nroValue -and $nroValue.$ValueName -eq $DesiredValue) {
+
+    $prompt = Read-Host "BypassNRO is already set. Revert/delete it? (Y/N)"
+
+    if ($prompt -eq "Y" -or $prompt -eq "y") {
+        try {
+            Remove-ItemProperty -Path $RegistryPath -Name $ValueName | Out-Null
+            Write-Host "Registry value '$ValueName' deleted."
+        }
+        catch {
+            Write-Error "Failed to delete registry value: $($_.Exception.Message)."
+            Write-Host "Please create an error report report at https://github.com/Fives-Useful-Tools/BypassNRO-Tool/issues"
+        }
+        $AskForReboot = 1
+    } else {
+        Write-Host "Action cancelled."
+    }
+} else {
+    # Setting doesn't exist, create and set it
+    try {
+        # Create the setting and set it
+        New-ItemProperty -Path $RegistryPath -Name $ValueName -Value $DesiredValue -PropertyType $PropertyType -Force | Out-Null
+        Write-Host "Successfully added the $ValueName setting to the registry."
+    }
+    catch {
+        Write-Error "Failed to create registry value: $($_.Exception.Message)"
+    }
+    $AskForReboot = 1
+}
+
+# The reboot part
+if ($AskForReboot -eq 1) {
+    $promptReboot = Read-Host "The previous change requires a reboot to apply. Reboot now? (Y/N)"
+
+    if ($promptReboot -eq "Y" -or $promptReboot -eq "y") {
+        Restart-Computer
+        Write-Host "Rebooting..."
+    } else { 
+        Write-Host "Reboot cancelled. Please reboot at the earliest convenience to apply the changes"
+    }
+}
